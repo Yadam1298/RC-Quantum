@@ -1,0 +1,117 @@
+/* ========== HEADER ========== */
+.premium-header {
+  --background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.premium-header ion-toolbar {
+  --background: transparent;
+  --border-width: 0;
+  padding: 0 8px;
+  min-height: 64px;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ========== AVATAR ========== */
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.25s ease;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-avatar:hover {
+  transform: scale(1.05);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.profile-avatar:active {
+  transform: scale(0.95);
+}
+
+.avatar-initials {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+/* ========== POPOVER ========== */
+.premium-popover {
+  --background: #ffffff;
+  --box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  --backdrop-opacity: 0.2;
+  border-radius: 16px;
+  margin-top: 8px;
+}
+
+.popover-list {
+  padding: 8px 0;
+}
+
+.popover-item {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --min-height: 48px;
+  --border-radius: 8px;
+  margin: 0 8px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.popover-item:hover {
+  --background: var(--ion-color-light);
+}
+
+.popover-item ion-icon {
+  font-size: 1.4rem;
+  margin-right: 12px;
+}
+
+.logout-item {
+  --color: var(--ion-color-danger);
+}
+
+.logout-item:hover {
+  --background: rgba(235, 68, 90, 0.08);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 480px) {
+  .app-title {
+    font-size: 1rem;
+    letter-spacing: 0.3px;
+  }
+  .profile-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  .avatar-initials {
+    font-size: 0.85rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .premium-header ion-toolbar {
+    padding: 0 16px;
+  }
+  .app-title {
+    font-size: 1.4rem;
+  }
+}

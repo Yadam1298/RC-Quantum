@@ -1,0 +1,12 @@
+export { default as EmployeeAvatar } from '../editEmployeeProfile/EmployeeAvatar';
+export { default as EmployeeInfo } from './EmployeeInfo';
+export { default as ActionButtons } from './ActionButtons';
+export { default as MobileMenu } from './MobileMenu';
+export { default as EmployeeProfileHeader } from './EmployeeProfileHeader';
+export { default as ProfileTabs } from './ProfileTabs';
+export { default as ProfileDetails } from './ProfileDetails';
+export { default as AttendanceSection } from './AttendanceSection';
+export { default as HistorySection } from './HistorySection';
+export { default as LoadingState } from './LoadingState';
+export { default as ErrorState } from './ErrorState';
+export { default as NotFoundState } from './NotFoundState';

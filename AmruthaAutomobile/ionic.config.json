@@ -1,0 +1,7 @@
+{
+  "name": "AmruthaAutomobile",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}
