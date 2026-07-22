@@ -13,7 +13,7 @@ const PunchSchema = new mongoose.Schema(
     },
     method: {
       type: String,
-      enum: ['RFID', 'App', 'Auto'], // ← added 'Auto'
+      enum: ['RFID', 'App', 'Auto'],
       default: 'RFID',
     },
     location: {

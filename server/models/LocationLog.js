@@ -28,7 +28,6 @@ const LocationLogSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Compound index for efficient queries by attendance and time
 LocationLogSchema.index({ attendance: 1, timestamp: 1 });
 
 module.exports = mongoose.model('LocationLog', LocationLogSchema);

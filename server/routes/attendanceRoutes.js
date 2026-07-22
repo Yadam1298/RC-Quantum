@@ -6,7 +6,7 @@ const {
   getEmployeeAttendanceByDate,
   getEmployeeAttendanceDates,
   getAttendanceDashboard,
-  markAttendanceMobile, // new
+  markAttendanceMobile,
 } = require('../controllers/attendanceController');
 const { addLocationLogs } = require('../controllers/LocationController');
 const { protect } = require('../middleware/authMiddleware');
