@@ -21,6 +21,10 @@ const LocationLogSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    accuracy: {
+      type: Number,
+      default: 0,
+    },
     address: {
       type: String,
     },

@@ -30,6 +30,7 @@ exports.addLocationLogs = async (req, res) => {
       timestamp: log.timestamp ? new Date(log.timestamp) : new Date(),
       lat: log.lat,
       lng: log.lng,
+      accuracy: log.accuracy || 0,
       address: log.address || '',
     }));
 

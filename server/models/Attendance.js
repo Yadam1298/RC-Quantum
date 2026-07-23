@@ -22,6 +22,14 @@ const PunchSchema = new mongoose.Schema(
       address: { type: String },
       _id: false,
     },
+    autoCheckout: {
+      type: Boolean,
+      default: false,
+    },
+    reason: {
+      type: String,
+      default: '',
+    },
   },
   { _id: false },
 );

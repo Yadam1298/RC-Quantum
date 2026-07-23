@@ -7,13 +7,11 @@ const LocationLog = require('../models/LocationLog');
 const resolveEmployeeId = async (identifier) => {
   if (!identifier) return null;
 
-  // Check if it's a valid ObjectId
   if (mongoose.Types.ObjectId.isValid(identifier)) {
     const employee = await Employee.findById(identifier).select('_id');
     if (employee) return employee._id;
   }
 
-  // Otherwise, treat as empID (case-insensitive)
   const employee = await Employee.findOne({
     empID: identifier.toUpperCase(),
   }).select('_id');
@@ -45,7 +43,6 @@ const computePairs = (punches) => {
       duration: outPunch
         ? (outPunch.timestamp - inPunch.timestamp) / (1000 * 60)
         : null,
-      // NEW: include method and location of the check-in (and optionally check-out)
       checkInMethod: inPunch.method,
       checkInLocation: inPunch.location,
       checkOutMethod: outPunch ? outPunch.method : null,
@@ -57,7 +54,7 @@ const computePairs = (punches) => {
 };
 
 // ------------------------------------------------------------------
-// 1. Mark attendance (public endpoint)
+// 1. Mark attendance (public endpoint for RFID)
 // ------------------------------------------------------------------
 exports.markAttendance = async (req, res) => {
   try {
@@ -80,7 +77,6 @@ exports.markAttendance = async (req, res) => {
     let attendance = await Attendance.findOne({ employee: employee._id, date });
 
     if (!attendance) {
-      // ---------- First punch of the day – always 'in' ----------
       const newPunch = {
         type: 'in',
         timestamp: now,
@@ -92,7 +88,7 @@ exports.markAttendance = async (req, res) => {
         employee: employee._id,
         date,
         punches: [newPunch],
-        lastLocationUpdate: now, // start tracking
+        lastLocationUpdate: now,
       });
 
       await attendance.save();
@@ -107,7 +103,6 @@ exports.markAttendance = async (req, res) => {
       });
     }
 
-    // ---------- Existing attendance – determine next type ----------
     const lastPunch = attendance.punches[attendance.punches.length - 1];
     const nextType = lastPunch.type === 'in' ? 'out' : 'in';
 
@@ -120,11 +115,10 @@ exports.markAttendance = async (req, res) => {
 
     attendance.punches.push(newPunch);
 
-    // Update lastLocationUpdate based on punch type
     if (nextType === 'in') {
       attendance.lastLocationUpdate = now;
     } else {
-      attendance.lastLocationUpdate = null; // stop tracking on checkout
+      attendance.lastLocationUpdate = null;
     }
 
     await attendance.save();
@@ -144,13 +138,11 @@ exports.markAttendance = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 1. Mark attendance on mobile (authenticated)
+// 2. Mark attendance on mobile (authenticated)
 // ------------------------------------------------------------------
 exports.markAttendanceMobile = async (req, res) => {
   try {
-    console.log('req.employee:', req.employee); // for debugging
-
-    const { type, lat, lng, address } = req.body;
+    const { type, lat, lng, address, autoCheckout = false, reason = '' } = req.body;
 
     if (!type || !['in', 'out'].includes(type)) {
       return res
@@ -158,7 +150,6 @@ exports.markAttendanceMobile = async (req, res) => {
         .json({ message: 'Valid type (in/out) is required' });
     }
 
-    // Get employee ID from req.employee
     if (!req.employee) {
       console.error('Employee not found in req.employee');
       return res
@@ -167,9 +158,6 @@ exports.markAttendanceMobile = async (req, res) => {
     }
 
     const employeeId = req.employee._id;
-
-    // Optional: verify employee exists (already done by middleware)
-    // but we can keep it safe
     const employee = await Employee.findById(employeeId);
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
@@ -181,7 +169,6 @@ exports.markAttendanceMobile = async (req, res) => {
     let attendance = await Attendance.findOne({ employee: employeeId, date });
 
     if (!attendance) {
-      // First punch of the day – must be 'in'
       if (type !== 'in') {
         return res
           .status(400)
@@ -209,7 +196,6 @@ exports.markAttendanceMobile = async (req, res) => {
       });
     }
 
-    // Existing attendance – determine next type
     const lastPunch = attendance.punches[attendance.punches.length - 1];
     const expectedType = lastPunch.type === 'in' ? 'out' : 'in';
     if (type !== expectedType) {
@@ -223,6 +209,8 @@ exports.markAttendanceMobile = async (req, res) => {
       timestamp: now,
       method: 'App',
       location: { lat, lng, address: address || '' },
+      autoCheckout: autoCheckout,
+      reason: reason,
     };
     attendance.punches.push(newPunch);
 
@@ -248,7 +236,7 @@ exports.markAttendanceMobile = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 2. Get all attendance logs (admin/superadmin)
+// 3. Get all attendance logs (admin/superadmin)
 // ------------------------------------------------------------------
 exports.getAttendanceLogs = async (req, res) => {
   try {
@@ -285,8 +273,8 @@ exports.getAttendanceLogs = async (req, res) => {
       _id: doc._id,
       employee: doc.employee,
       date: doc.date,
-      punches: doc.punches, // now includes method & location
-      pairs: computePairs(doc.punches), // now includes method & location in pairs
+      punches: doc.punches,
+      pairs: computePairs(doc.punches),
       totalMinutes: computePairs(doc.punches).reduce(
         (sum, p) => sum + (p.duration || 0),
         0,
@@ -309,7 +297,7 @@ exports.getAttendanceLogs = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 3. Get attendance for a specific employee and date
+// 4. Get attendance for a specific employee and date
 // ------------------------------------------------------------------
 exports.getEmployeeAttendanceByDate = async (req, res) => {
   try {
@@ -322,7 +310,6 @@ exports.getEmployeeAttendanceByDate = async (req, res) => {
         .json({ message: 'Date query parameter is required (YYYY-MM-DD)' });
     }
 
-    // Resolve the employee _id
     const empObjectId = await resolveEmployeeId(employeeId);
     if (!empObjectId) {
       return res.status(404).json({ message: 'Employee not found' });
@@ -347,8 +334,8 @@ exports.getEmployeeAttendanceByDate = async (req, res) => {
     res.json({
       employee: attendance.employee,
       date: attendance.date,
-      punches: attendance.punches, // includes method & location
-      pairs, // includes method & location
+      punches: attendance.punches,
+      pairs,
       totalMinutes: pairs.reduce((sum, p) => sum + (p.duration || 0), 0),
     });
   } catch (error) {
@@ -358,7 +345,7 @@ exports.getEmployeeAttendanceByDate = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 4. Get calendar overview for an employee
+// 5. Get calendar overview for an employee
 // ------------------------------------------------------------------
 exports.getEmployeeAttendanceDates = async (req, res) => {
   try {
@@ -371,7 +358,6 @@ exports.getEmployeeAttendanceDates = async (req, res) => {
         .json({ message: 'year and month query parameters are required' });
     }
 
-    // Resolve employee _id
     const empObjectId = await resolveEmployeeId(employeeId);
     if (!empObjectId) {
       return res.status(404).json({ message: 'Employee not found' });
@@ -405,7 +391,7 @@ exports.getEmployeeAttendanceDates = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// Dashboard Summary
+// 6. Dashboard Summary
 // ------------------------------------------------------------------
 exports.getAttendanceDashboard = async (req, res) => {
   try {
@@ -413,10 +399,8 @@ exports.getAttendanceDashboard = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-    // Total Employees
     const totalEmployees = await Employee.countDocuments();
 
-    // Today's Attendance
     const todayAttendance = await Attendance.find({
       date: {
         $gte: today,
@@ -457,7 +441,6 @@ exports.getAttendanceDashboard = async (req, res) => {
 
       let status = 'Present';
 
-      // Office starts at 9:15 AM
       if (firstPunch) {
         const hour = firstPunch.timestamp.getHours();
         const minute = firstPunch.timestamp.getMinutes();
@@ -486,7 +469,6 @@ exports.getAttendanceDashboard = async (req, res) => {
           [...punches].reverse().find((p) => p.type === 'out')?.timestamp ||
           null,
         workingMinutes: workedMinutes,
-        // Optionally add method & location of first/last punch if needed
       });
     }
 
@@ -526,11 +508,9 @@ exports.getAttendanceDashboard = async (req, res) => {
   }
 };
 
-
-
-// ================================================================
-// 5. Get location history for an employee (admin/superadmin)
-// ================================================================
+// ------------------------------------------------------------------
+// 7. Get location history for an employee (admin/superadmin)
+// ------------------------------------------------------------------
 exports.getEmployeeLocationHistory = async (req, res) => {
   try {
     const { employeeId, startDate, endDate, page = 1, limit = 50 } = req.query;
@@ -539,20 +519,17 @@ exports.getEmployeeLocationHistory = async (req, res) => {
       return res.status(400).json({ message: 'employeeId is required' });
     }
 
-    // Resolve employee _id
     const empObjectId = await resolveEmployeeId(employeeId);
     if (!empObjectId) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Authorization: if requester is not admin/superadmin, they can only see their own location
     if (req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
       if (req.employee._id.toString() !== empObjectId.toString()) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
 
-    // Build date filter
     const dateFilter = {};
     if (startDate) {
       dateFilter.$gte = getStartOfDay(new Date(startDate));
@@ -561,7 +538,6 @@ exports.getEmployeeLocationHistory = async (req, res) => {
       dateFilter.$lte = getStartOfDay(new Date(endDate));
     }
 
-    // Find all attendance records for this employee within date range
     const attendanceFilter = { employee: empObjectId };
     if (startDate || endDate) {
       attendanceFilter.date = dateFilter;
@@ -577,7 +553,6 @@ exports.getEmployeeLocationHistory = async (req, res) => {
       return res.json({ logs: [], total: 0, pagination: { total: 0, page: parseInt(page), limit: parseInt(limit), pages: 0 } });
     }
 
-    // Paginate LocationLogs
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const filter = { attendance: { $in: attendanceIds } };
 
@@ -609,9 +584,9 @@ exports.getEmployeeLocationHistory = async (req, res) => {
   }
 };
 
-// ================================================================
-// 6. Get live location (most recent) for an employee
-// ================================================================
+// ------------------------------------------------------------------
+// 8. Get live location (most recent) for an employee
+// ------------------------------------------------------------------
 exports.getEmployeeLiveLocation = async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -625,14 +600,12 @@ exports.getEmployeeLiveLocation = async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Authorization
     if (req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
       if (req.employee._id.toString() !== empObjectId.toString()) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
 
-    // Get the most recent location log for this employee
     const latestLog = await LocationLog.findOne()
       .populate({
         path: 'attendance',
@@ -653,9 +626,9 @@ exports.getEmployeeLiveLocation = async (req, res) => {
   }
 };
 
-// ================================================================
-// 7. Get location logs for a specific attendance record
-// ================================================================
+// ------------------------------------------------------------------
+// 9. Get location logs for a specific attendance record
+// ------------------------------------------------------------------
 exports.getLocationLogsByAttendance = async (req, res) => {
   try {
     const { attendanceId } = req.params;
@@ -670,7 +643,6 @@ exports.getLocationLogsByAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    // Authorization
     if (req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
       if (req.employee._id.toString() !== attendance.employee._id.toString()) {
         return res.status(403).json({ message: 'Access denied' });
