@@ -1,10 +1,6 @@
 const Attendance = require('../models/Attendance');
 const LocationLog = require('../models/LocationLog');
 
-/**
- * POST /api/attendance/location
- * Body: { attendanceId, logs: [ { lat, lng, timestamp, address? } ] }
- */
 exports.addLocationLogs = async (req, res) => {
   try {
     const { attendanceId, logs } = req.body;
@@ -20,7 +16,6 @@ exports.addLocationLogs = async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    // Ensure the authenticated employee owns this attendance
     if (!req.employee) {
       return res.status(401).json({ message: 'Not authenticated' });
     }

@@ -6,16 +6,13 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const cors = require('cors');
 
-// Import the auto‑checkout job
-const startAutoCheckout = require('./jobs/autoCheckout');
-
 dotenv.config();
 
 const app = express();
 
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
-app.use(cors()); // simplified
+app.use(cors());
 
 app.use((req, res, next) => {
   console.log("=================================");
@@ -40,8 +37,7 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB successfully.');
-    // Start the cron job after DB connection
-    startAutoCheckout();
+    // Auto-checkout job is REMOVED – frontend handles it
     app.listen(PORT, '0.0.0.0', () => console.log(`Server running on 0.0.0.0:${PORT}`));
   })
   .catch((err) => {
