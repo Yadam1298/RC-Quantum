@@ -1,6 +1,7 @@
 const Attendance = require('../models/Attendance');
 const Employee = require('../models/Employee');
 const mongoose = require('mongoose');
+const LocationLog = require('../models/LocationLog');
 
 // ---------- Helper: resolve employee _id from empID or ObjectId ----------
 const resolveEmployeeId = async (identifier) => {
@@ -522,5 +523,170 @@ exports.getAttendanceDashboard = async (req, res) => {
       message: 'Failed to fetch dashboard',
       error: error.message,
     });
+  }
+};
+
+
+
+// ================================================================
+// 5. Get location history for an employee (admin/superadmin)
+// ================================================================
+exports.getEmployeeLocationHistory = async (req, res) => {
+  try {
+    const { employeeId, startDate, endDate, page = 1, limit = 50 } = req.query;
+
+    if (!employeeId) {
+      return res.status(400).json({ message: 'employeeId is required' });
+    }
+
+    // Resolve employee _id
+    const empObjectId = await resolveEmployeeId(employeeId);
+    if (!empObjectId) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Authorization: if requester is not admin/superadmin, they can only see their own location
+    if (req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
+      if (req.employee._id.toString() !== empObjectId.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) {
+      dateFilter.$gte = getStartOfDay(new Date(startDate));
+    }
+    if (endDate) {
+      dateFilter.$lte = getStartOfDay(new Date(endDate));
+    }
+
+    // Find all attendance records for this employee within date range
+    const attendanceFilter = { employee: empObjectId };
+    if (startDate || endDate) {
+      attendanceFilter.date = dateFilter;
+    }
+
+    const attendances = await Attendance.find(attendanceFilter)
+      .select('_id')
+      .lean();
+
+    const attendanceIds = attendances.map(a => a._id);
+
+    if (attendanceIds.length === 0) {
+      return res.json({ logs: [], total: 0, pagination: { total: 0, page: parseInt(page), limit: parseInt(limit), pages: 0 } });
+    }
+
+    // Paginate LocationLogs
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const filter = { attendance: { $in: attendanceIds } };
+
+    const [logs, total] = await Promise.all([
+      LocationLog.find(filter)
+        .populate({
+          path: 'attendance',
+          populate: { path: 'employee', select: 'empID name designation profileImage' }
+        })
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      LocationLog.countDocuments(filter),
+    ]);
+
+    res.json({
+      logs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching location history:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// ================================================================
+// 6. Get live location (most recent) for an employee
+// ================================================================
+exports.getEmployeeLiveLocation = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+
+    if (!employeeId) {
+      return res.status(400).json({ message: 'employeeId is required' });
+    }
+
+    const empObjectId = await resolveEmployeeId(employeeId);
+    if (!empObjectId) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Authorization
+    if (req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
+      if (req.employee._id.toString() !== empObjectId.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    // Get the most recent location log for this employee
+    const latestLog = await LocationLog.findOne()
+      .populate({
+        path: 'attendance',
+        match: { employee: empObjectId },
+        populate: { path: 'employee', select: 'empID name designation profileImage' }
+      })
+      .sort({ timestamp: -1 })
+      .lean();
+
+    if (!latestLog || !latestLog.attendance) {
+      return res.status(404).json({ message: 'No location data found for this employee' });
+    }
+
+    res.json(latestLog);
+  } catch (error) {
+    console.error('Error fetching live location:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// ================================================================
+// 7. Get location logs for a specific attendance record
+// ================================================================
+exports.getLocationLogsByAttendance = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(attendanceId)) {
+      return res.status(400).json({ message: 'Invalid attendance ID' });
+    }
+
+    const attendance = await Attendance.findById(attendanceId)
+      .populate('employee', 'empID name designation profileImage');
+    if (!attendance) {
+      return res.status(404).json({ message: 'Attendance record not found' });
+    }
+
+    // Authorization
+    if (req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
+      if (req.employee._id.toString() !== attendance.employee._id.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    const logs = await LocationLog.find({ attendance: attendanceId })
+      .sort({ timestamp: 1 })
+      .lean();
+
+    res.json({
+      attendance,
+      logs,
+    });
+  } catch (error) {
+    console.error('Error fetching location logs for attendance:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

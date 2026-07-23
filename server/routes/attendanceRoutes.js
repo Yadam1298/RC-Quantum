@@ -7,6 +7,9 @@ const {
   getEmployeeAttendanceDates,
   getAttendanceDashboard,
   markAttendanceMobile,
+  getEmployeeLocationHistory,
+  getEmployeeLiveLocation,
+  getLocationLogsByAttendance,
 } = require('../controllers/attendanceController');
 const { addLocationLogs } = require('../controllers/LocationController');
 const { protect } = require('../middleware/authMiddleware');
@@ -17,6 +20,11 @@ router.post('/mark', markAttendance);
 
 // All routes below require authentication
 router.use(protect);
+
+// Employee can see their own; admin/superadmin can see any
+router.get('/location/history', getEmployeeLocationHistory);
+router.get('/location/live/:employeeId', getEmployeeLiveLocation);
+router.get('/location/attendance/:attendanceId', getLocationLogsByAttendance);
 
 // Employee routes (accessible by any authenticated user)
 router.post('/location', addLocationLogs);
