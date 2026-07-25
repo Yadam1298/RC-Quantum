@@ -31,6 +31,9 @@ exports.addLocationLogs = async (req, res) => {
       lat: log.lat,
       lng: log.lng,
       accuracy: log.accuracy || 0,
+      speed: typeof log.speed === 'number' ? log.speed : null,
+      bearing: typeof log.bearing === 'number' ? log.bearing : null,
+      altitude: typeof log.altitude === 'number' ? log.altitude : null,
       address: log.address || '',
     }));
 
