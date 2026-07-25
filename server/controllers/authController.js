@@ -88,6 +88,8 @@ exports.loginEmployee = async (req, res) => {
         role: employee.role,
         designation: employee.designation,
         email: employee.email,
+        profileImage: employee.profileImage,
+
       },
     });
   } catch (error) {
