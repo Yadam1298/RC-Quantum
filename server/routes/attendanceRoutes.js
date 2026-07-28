@@ -10,7 +10,7 @@ const {
   getEmployeeLocationHistory,
   getEmployeeLiveLocation,
   getLocationLogsByAttendance,
-  getEmployeeAttendanceByDate,
+  getLocationLogsByTimeRange,
 } = require("../controllers/attendanceController");
 const { addLocationLogs } = require("../controllers/LocationController");
 const { protect } = require("../middleware/authMiddleware");
@@ -26,7 +26,7 @@ router.use(protect);
 router.get("/location/history", getEmployeeLocationHistory);
 router.get("/location/live/:employeeId", getEmployeeLiveLocation);
 router.get("/location/attendance/:attendanceId", getLocationLogsByAttendance);
-router.get("/location/range/:employeeId", getEmployeeAttendanceByDate);
+router.get("/location/range/:employeeId", getLocationLogsByTimeRange);
 
 // Employee routes (accessible by any authenticated user)
 router.post("/location", addLocationLogs);
