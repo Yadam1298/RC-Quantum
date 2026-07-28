@@ -335,7 +335,6 @@ exports.getEmployeeAttendanceByDate = async (req, res) => {
       employee: attendance.employee,
       date: attendance.date,
       punches: attendance.punches,
-      method: attendance.punches.method,
       pairs,
       totalMinutes: pairs.reduce((sum, p) => sum + (p.duration || 0), 0),
     });
