@@ -672,7 +672,9 @@ exports.getLocationLogsByTimeRange = async (req, res) => {
     const { startTime, endTime } = req.query;
 
     if (!employeeId || !startTime || !endTime) {
-      return res.status(400).json({ message: 'employeeId, startTime, and endTime are required' });
+      return res.status(400).json({ 
+        message: 'employeeId, startTime, and endTime are required' 
+      });
     }
 
     const empObjectId = await resolveEmployeeId(employeeId);
@@ -680,15 +682,25 @@ exports.getLocationLogsByTimeRange = async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Find attendance records belonging to this employee
-    const attendances = await Attendance.find({ employee: empObjectId }).select('_id').lean();
+    // Authorization check matching your other routes
+    if (req.employee && req.employee.role !== 'admin' && req.employee.role !== 'superadmin') {
+      if (req.employee._id.toString() !== empObjectId.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    // Find attendance records belonging to this employee that overlap with the time range
+    const attendances = await Attendance.find({
+      employee: empObjectId,
+    }).select('_id date').lean();
+
     const attendanceIds = attendances.map(a => a._id);
 
     if (attendanceIds.length === 0) {
       return res.json({ logs: [] });
     }
 
-    // Query LocationLogs within the start and end timestamps
+    // Query LocationLogs tied to the employee's attendance records within exact timestamps
     const logs = await LocationLog.find({
       attendance: { $in: attendanceIds },
       timestamp: {
