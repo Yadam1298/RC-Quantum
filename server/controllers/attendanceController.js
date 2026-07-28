@@ -662,3 +662,46 @@ exports.getLocationLogsByAttendance = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// ------------------------------------------------------------------
+// 10. Get location logs by time range for an employee session
+// ------------------------------------------------------------------
+exports.getLocationLogsByTimeRange = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { startTime, endTime } = req.query;
+
+    if (!employeeId || !startTime || !endTime) {
+      return res.status(400).json({ message: 'employeeId, startTime, and endTime are required' });
+    }
+
+    const empObjectId = await resolveEmployeeId(employeeId);
+    if (!empObjectId) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Find attendance records belonging to this employee
+    const attendances = await Attendance.find({ employee: empObjectId }).select('_id').lean();
+    const attendanceIds = attendances.map(a => a._id);
+
+    if (attendanceIds.length === 0) {
+      return res.json({ logs: [] });
+    }
+
+    // Query LocationLogs within the start and end timestamps
+    const logs = await LocationLog.find({
+      attendance: { $in: attendanceIds },
+      timestamp: {
+        $gte: new Date(startTime),
+        $lte: new Date(endTime),
+      },
+    })
+      .sort({ timestamp: 1 })
+      .lean();
+
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching logs by time range:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
