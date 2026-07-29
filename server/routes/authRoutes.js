@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   registerEmployee,
   loginEmployee,
+  VerifyToken,
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -19,5 +20,7 @@ router.post(
   authorizeRoles('superadmin'),
   registerEmployee,
 );
+
+router.post('/verify-token', VerifyToken);
 
 module.exports = router;

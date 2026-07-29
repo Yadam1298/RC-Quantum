@@ -105,3 +105,52 @@ exports.loginEmployee = async (req, res) => {
     });
   }
 };
+
+exports.VerifyToken = async (req, res) => {
+  try {
+    // Expects an authentication middleware that extracts the token and attaches user ID to req.user or req.employeeId
+    // If you are using standard middleware, req.employee or req.user contains the decoded token payload.
+    const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided, authorization denied.' });
+    }
+
+    // Verify JWT validity & expiration
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Find employee by ID from the token
+    const employee = await Employee.findById(decoded.id);
+
+    if (!employee) {
+      return res.status(401).json({ message: 'User belonging to this token no longer exists.' });
+    }
+
+    // Single-device check: Compare incoming token with the activeSessionToken in DB
+    if (employee.activeSessionToken !== token) {
+      return res.status(401).json({ 
+        message: 'You are logged in somewhere else. This session has been terminated.' 
+      });
+    }
+
+    // Token is fully valid and active
+    return res.status(200).json({
+      valid: true,
+      message: 'Token is valid',
+      employee: {
+        id: employee._id,
+        empID: employee.empID,
+        name: employee.name,
+        role: employee.role,
+        designation: employee.designation,
+      }
+    });
+
+  } catch (error) {
+    console.error('Token verification error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token has expired.' });
+    }
+    return res.status(401).json({ message: 'Token is invalid or expired.' });
+  }
+};
