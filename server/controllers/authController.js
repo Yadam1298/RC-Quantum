@@ -1,4 +1,3 @@
-// controllers/authController.js
 const Employee = require('../models/Employee');
 const jwt = require('jsonwebtoken');
 
@@ -6,7 +5,6 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 };
 
-// Register User - Can be used by Super Admin (we'll protect route later)
 exports.registerEmployee = async (req, res) => {
   const { empID, cardUID, name, phone, email, password, designation, role } =
     req.body;
@@ -31,12 +29,16 @@ exports.registerEmployee = async (req, res) => {
       email,
       password,
       designation,
-      role: role || 'employee', // Accept role from superadmin
+      role: role || 'employee',
     });
+
+    const token = generateToken(employee._id);
+    employee.activeSessionToken = token;
+    await employee.save();
 
     return res.status(201).json({
       message: 'User registered successfully',
-      token: generateToken(employee._id),
+      token,
       employee: {
         id: employee._id,
         empID: employee.empID,
@@ -54,7 +56,6 @@ exports.registerEmployee = async (req, res) => {
   }
 };
 
-// Login (Unchanged - works for all roles)
 exports.loginEmployee = async (req, res) => {
   const { identifier, password } = req.body;
 
@@ -78,9 +79,14 @@ exports.loginEmployee = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
+    // Generate new token & overwrite active session token (terminates other device's sessions)
+    const token = generateToken(employee._id);
+    employee.activeSessionToken = token;
+    await employee.save();
+
     return res.json({
       message: 'Login successful',
-      token: generateToken(employee._id),
+      token,
       employee: {
         id: employee._id,
         empID: employee.empID,
@@ -89,7 +95,6 @@ exports.loginEmployee = async (req, res) => {
         designation: employee.designation,
         email: employee.email,
         profileImage: employee.profileImage,
-
       },
     });
   } catch (error) {
