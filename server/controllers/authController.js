@@ -1,5 +1,6 @@
 const Employee = require('../models/Employee');
 const jwt = require('jsonwebtoken');
+const { forceCheckoutActiveSession } = require('../services/attendanceService');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1d' });
@@ -79,6 +80,23 @@ exports.loginEmployee = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
+    // FIX: if this employee is still checked-in from a previous session
+    // (possibly on another, now-unreachable device), force-close that
+    // attendance session BEFORE switching the active device over. This is
+    // what makes "login on device B force-checks-out device A" work even
+    // when device A is offline - it never depends on device A being
+    // reachable, only on the DB.
+    try {
+      await forceCheckoutActiveSession(
+        employee._id,
+        'Force checkout - logged in on another device',
+      );
+    } catch (checkoutErr) {
+      console.error('Force checkout on login failed:', checkoutErr);
+      // Don't block login over this - the employee should still be able to
+      // sign in even if the force-checkout bookkeeping has an issue.
+    }
+
     // Generate new token & overwrite active session token (terminates other device's sessions)
     const token = generateToken(employee._id);
     employee.activeSessionToken = token;
@@ -108,32 +126,26 @@ exports.loginEmployee = async (req, res) => {
 
 exports.VerifyToken = async (req, res) => {
   try {
-    // Expects an authentication middleware that extracts the token and attaches user ID to req.user or req.employeeId
-    // If you are using standard middleware, req.employee or req.user contains the decoded token payload.
     const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided, authorization denied.' });
     }
 
-    // Verify JWT validity & expiration
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Find employee by ID from the token
     const employee = await Employee.findById(decoded.id);
 
     if (!employee) {
       return res.status(401).json({ message: 'User belonging to this token no longer exists.' });
     }
 
-    // Single-device check: Compare incoming token with the activeSessionToken in DB
     if (employee.activeSessionToken !== token) {
-      return res.status(401).json({ 
-        message: 'You are logged in somewhere else. This session has been terminated.' 
+      return res.status(401).json({
+        code: 'LOGGED_IN_ELSEWHERE',
+        message: 'You are logged in somewhere else. This session has been terminated.',
       });
     }
 
-    // Token is fully valid and active
     return res.status(200).json({
       valid: true,
       message: 'Token is valid',
@@ -143,9 +155,8 @@ exports.VerifyToken = async (req, res) => {
         name: employee.name,
         role: employee.role,
         designation: employee.designation,
-      }
+      },
     });
-
   } catch (error) {
     console.error('Token verification error:', error);
     if (error.name === 'TokenExpiredError') {
