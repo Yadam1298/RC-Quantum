@@ -242,10 +242,17 @@ exports.updateProfileImage = async (req, res) => {
 // ==========================================================
 exports.getMyProfile = async (req, res) => {
   try {
-    // req.user is populated by the 'protect' middleware using JWT token
-    const employee = await Employee.findOne({
-      empID: req.user.empID,
-    }).select('-password');
+    // Safely look for empID across different common token structures (req.user or req.employee)
+    const empID = req.user?.empID || req.user?.id || req.employee?.empID || req.employee?.id;
+
+    if (!empID) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication token payload missing employee ID',
+      });
+    }
+
+    const employee = await Employee.findOne({ empID }).select('-password');
 
     if (!employee) {
       return res.status(404).json({
@@ -259,6 +266,7 @@ exports.getMyProfile = async (req, res) => {
       employee,
     });
   } catch (error) {
+    console.error('getMyProfile error:', error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -271,9 +279,16 @@ exports.getMyProfile = async (req, res) => {
 // ==========================================================
 exports.updateMyProfile = async (req, res) => {
   try {
-    const employee = await Employee.findOne({
-      empID: req.user.empID,
-    });
+    const empID = req.user?.empID || req.user?.id || req.employee?.empID || req.employee?.id;
+
+    if (!empID) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication token payload missing employee ID',
+      });
+    }
+
+    const employee = await Employee.findOne({ empID });
 
     if (!employee) {
       return res.status(404).json({
@@ -282,8 +297,6 @@ exports.updateMyProfile = async (req, res) => {
       });
     }
 
-    // Employees can typically update non-sensitive fields like name, phone, email, profile image.
-    // Restrict editing role, designation, cardUID, or status to admins.
     employee.name = req.body.name ?? employee.name;
     employee.phone = req.body.phone ?? employee.phone;
     employee.email = req.body.email ?? employee.email;
@@ -308,6 +321,7 @@ exports.updateMyProfile = async (req, res) => {
       employee,
     });
   } catch (error) {
+    console.error('updateMyProfile error:', error);
     res.status(500).json({
       success: false,
       message: error.message,
