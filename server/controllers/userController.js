@@ -5,21 +5,29 @@ const Employee = require('../models/Employee');
 // ============================
 exports.getMyProfile = async (req, res) => {
   try {
-    // Fallback search criteria matching common JWT payload conventions
-    const identifier = req.user._id || req.user.id || req.user.empID;
-    
+    // Check all possible ID structures attached by JWT protect middleware
+    const userId = req.user?._id || req.user?.id || req.user?.empID;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized, user ID missing from token',
+      });
+    }
+
     let employee = null;
-    if (identifier.toString().startsWith('EMP') || !identifier.match(/^[0-9a-fA-F]{24}$/)) {
-      // If it looks like an empID string instead of a MongoDB ObjectId
-      employee = await Employee.findOne({ empID: identifier }).select('-password');
+    
+    // Check if it's a standard MongoDB ObjectId or custom string ID (like EMP0001)
+    if (userId.toString().match(/^[0-9a-fA-F]{24}$/)) {
+      employee = await Employee.findById(userId).select('-password');
     } else {
-      employee = await Employee.findById(identifier).select('-password');
+      employee = await Employee.findOne({ empID: userId }).select('-password');
     }
 
     if (!employee) {
       return res.status(404).json({
         success: false,
-        message: 'Employee profile not found',
+        message: 'Employee profile not found in database',
       });
     }
 
@@ -28,7 +36,7 @@ exports.getMyProfile = async (req, res) => {
       employee,
     });
   } catch (error) {
-    console.error("Error in getMyProfile:", error.message);
+    console.error('❌ Server Error in getMyProfile:', error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -41,13 +49,20 @@ exports.getMyProfile = async (req, res) => {
 // ============================
 exports.updateMyProfile = async (req, res) => {
   try {
-    const identifier = req.user._id || req.user.id || req.user.empID;
-    
+    const userId = req.user?._id || req.user?.id || req.user?.empID;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized, user ID missing from token',
+      });
+    }
+
     let employee = null;
-    if (identifier.toString().startsWith('EMP') || !identifier.match(/^[0-9a-fA-F]{24}$/)) {
-      employee = await Employee.findOne({ empID: identifier });
+    if (userId.toString().match(/^[0-9a-fA-F]{24}$/)) {
+      employee = await Employee.findById(userId);
     } else {
-      employee = await Employee.findById(identifier);
+      employee = await Employee.findOne({ empID: userId });
     }
 
     if (!employee) {
@@ -83,7 +98,7 @@ exports.updateMyProfile = async (req, res) => {
       employee: updatedEmployee,
     });
   } catch (error) {
-    console.error("Error in updateMyProfile:", error.message);
+    console.error('❌ Server Error in updateMyProfile:', error);
     res.status(500).json({
       success: false,
       message: error.message,
