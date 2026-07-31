@@ -1,6 +1,7 @@
 const Employee = require('../models/Employee');
 const jwt = require('jsonwebtoken');
 const { forceCheckoutActiveSession } = require('../services/attendanceService');
+const { emitForceLogoutToUser } = require('../socketManager');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1d' });
@@ -98,9 +99,14 @@ exports.loginEmployee = async (req, res) => {
     }
 
     // Generate new token & overwrite active session token (terminates other device's sessions)
+    const previousToken = employee.activeSessionToken;
     const token = generateToken(employee._id);
     employee.activeSessionToken = token;
     await employee.save();
+
+    if (previousToken) {
+      emitForceLogoutToUser(previousToken, 'You are logged in somewhere else. This session has been terminated.');
+    }
 
     return res.json({
       message: 'Login successful',
@@ -140,6 +146,7 @@ exports.VerifyToken = async (req, res) => {
     }
 
     if (employee.activeSessionToken !== token) {
+      emitForceLogoutToUser(token, 'You are logged in somewhere else. This session has been terminated.');
       return res.status(401).json({
         code: 'LOGGED_IN_ELSEWHERE',
         message: 'You are logged in somewhere else. This session has been terminated.',
