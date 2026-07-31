@@ -5,8 +5,16 @@ const Employee = require('../models/Employee');
 // ============================
 exports.getMyProfile = async (req, res) => {
   try {
-    // req.user comes from your 'protect' authentication middleware
-    const employee = await Employee.findById(req.user._id).select('-password');
+    // Fallback search criteria matching common JWT payload conventions
+    const identifier = req.user._id || req.user.id || req.user.empID;
+    
+    let employee = null;
+    if (identifier.toString().startsWith('EMP') || !identifier.match(/^[0-9a-fA-F]{24}$/)) {
+      // If it looks like an empID string instead of a MongoDB ObjectId
+      employee = await Employee.findOne({ empID: identifier }).select('-password');
+    } else {
+      employee = await Employee.findById(identifier).select('-password');
+    }
 
     if (!employee) {
       return res.status(404).json({
@@ -20,6 +28,7 @@ exports.getMyProfile = async (req, res) => {
       employee,
     });
   } catch (error) {
+    console.error("Error in getMyProfile:", error.message);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -32,7 +41,14 @@ exports.getMyProfile = async (req, res) => {
 // ============================
 exports.updateMyProfile = async (req, res) => {
   try {
-    const employee = await Employee.findById(req.user._id);
+    const identifier = req.user._id || req.user.id || req.user.empID;
+    
+    let employee = null;
+    if (identifier.toString().startsWith('EMP') || !identifier.match(/^[0-9a-fA-F]{24}$/)) {
+      employee = await Employee.findOne({ empID: identifier });
+    } else {
+      employee = await Employee.findById(identifier);
+    }
 
     if (!employee) {
       return res.status(404).json({
@@ -41,12 +57,10 @@ exports.updateMyProfile = async (req, res) => {
       });
     }
 
-    // Allow employees to update personal fields (prevent updating role, status, or empID directly)
     employee.name = req.body.name ?? employee.name;
     employee.phone = req.body.phone ?? employee.phone;
     employee.email = req.body.email ?? employee.email;
 
-    // Optional profile image update validation
     if (req.body.profileImage) {
       const base64Regex = /^data:image\/(jpeg|png|gif|bmp|webp);base64,/;
       if (base64Regex.test(req.body.profileImage)) {
@@ -61,7 +75,6 @@ exports.updateMyProfile = async (req, res) => {
 
     await employee.save();
 
-    // Return updated profile without password
     const updatedEmployee = await Employee.findById(employee._id).select('-password');
 
     res.json({
@@ -70,6 +83,7 @@ exports.updateMyProfile = async (req, res) => {
       employee: updatedEmployee,
     });
   } catch (error) {
+    console.error("Error in updateMyProfile:", error.message);
     res.status(500).json({
       success: false,
       message: error.message,
