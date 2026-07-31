@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const authRoutes = require('./routes/authRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
+const userRoutes = require('./routes/userRoutes')
 const cors = require('cors');
 
 dotenv.config();
@@ -18,7 +19,7 @@ app.use((req, res, next) => {
   console.log("=================================");
   console.log("METHOD :", req.method);
   console.log("URL    :", req.originalUrl);
-  console.log("BODY   :", req.body);
+  console.log("BODY   :", "undefined");
   console.log("=================================");
   next();
 });
@@ -27,6 +28,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/users', userRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.get('/', (req, res) => {
