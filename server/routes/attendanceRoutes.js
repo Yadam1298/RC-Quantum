@@ -22,22 +22,24 @@ router.post("/mark", markAttendance);
 // All routes below require authentication
 router.use(protect);
 
-// Employee can see their own; admin/superadmin can see any
+// Location routes (Employee sees own; Admin/Superadmin sees any)
 router.get("/location/history", getEmployeeLocationHistory);
 router.get("/location/live/:employeeId", getEmployeeLiveLocation);
 router.get("/location/attendance/:attendanceId", getLocationLogsByAttendance);
 router.get("/location/range/:employeeId", getLocationLogsByTimeRange);
 
-// Employee routes (accessible by any authenticated user)
+// Employee routes (Accessible by any authenticated user)
 router.post("/location", addLocationLogs);
 router.post("/mobile/mark", markAttendanceMobile);
 
-// Admin / Superadmin only
-router.use(authorizeRoles("admin", "superadmin"));
-
-router.get("/dashboard", getAttendanceDashboard);
+// Attendance routes accessible by Employees (for self) and Admin/Superadmin (for all)
 router.get("/logs", getAttendanceLogs);
 router.get("/employee/:employeeId", getEmployeeAttendanceByDate);
 router.get("/employee/:employeeId/calendar", getEmployeeAttendanceDates);
+
+// Admin / Superadmin ONLY routes
+router.use(authorizeRoles("admin", "superadmin"));
+
+router.get("/dashboard", getAttendanceDashboard);
 
 module.exports = router;

@@ -236,19 +236,27 @@ exports.markAttendanceMobile = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 3. Get all attendance logs (admin/superadmin)
+// 3. Get attendance logs (Admin sees all; Employee sees ONLY their own)
 // ------------------------------------------------------------------
 exports.getAttendanceLogs = async (req, res) => {
   try {
     const { employeeId, startDate, endDate, page = 1, limit = 50 } = req.query;
     const filter = {};
 
-    if (employeeId) {
-      const empObjectId = await resolveEmployeeId(employeeId);
-      if (!empObjectId) {
-        return res.status(404).json({ message: 'Employee not found' });
+    const isAdmin = ['admin', 'superadmin'].includes(req.employee.role);
+
+    if (isAdmin) {
+      // Admin can filter by any employee or fetch all
+      if (employeeId) {
+        const empObjectId = await resolveEmployeeId(employeeId);
+        if (!empObjectId) {
+          return res.status(404).json({ message: 'Employee not found' });
+        }
+        filter.employee = empObjectId;
       }
-      filter.employee = empObjectId;
+    } else {
+      // Standard employees are strictly locked to their own employee ID
+      filter.employee = req.employee._id;
     }
 
     if (startDate || endDate) {
@@ -315,6 +323,12 @@ exports.getEmployeeAttendanceByDate = async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
+    // Role check: non-admins can only view their own attendance
+    const isAdmin = ['admin', 'superadmin'].includes(req.employee.role);
+    if (!isAdmin && req.employee._id.toString() !== empObjectId.toString()) {
+      return res.status(403).json({ message: 'Access denied. You can only view your own attendance.' });
+    }
+
     const start = getStartOfDay(new Date(date));
     const end = new Date(start);
     end.setUTCDate(end.getUTCDate() + 1);
@@ -361,6 +375,12 @@ exports.getEmployeeAttendanceDates = async (req, res) => {
     const empObjectId = await resolveEmployeeId(employeeId);
     if (!empObjectId) {
       return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Role check: non-admins can only view their own calendar
+    const isAdmin = ['admin', 'superadmin'].includes(req.employee.role);
+    if (!isAdmin && req.employee._id.toString() !== empObjectId.toString()) {
+      return res.status(403).json({ message: 'Access denied. You can only view your own calendar.' });
     }
 
     const start = new Date(year, month - 1, 1);
